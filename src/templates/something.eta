@@ -7,7 +7,7 @@
     <title>E2EE Slack</title>
     <link
   rel="stylesheet"
-  href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"
+  href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.jade.min.css"
 >
 </head>
 <body>
@@ -19,11 +19,43 @@ Hi <%= it.name %>!
     <p>
 You are on slug <%= it.slug %>.
     </p>
+    <form>
+        <label>
+            Passphrase
+    <input
+      type="password"
+      name="passphrase"
+      placeholder=""
+      id="passphrase-input"
+    />
+    <small id="password-helper">
+        Super secret passphrase which will be used for the encryption of your key
+    </small>
+        </label>
+    <fieldset role="group">
+    <input
+      type="text"
+      name="key"
+      placeholder=""
+      disabled
+    />
+    <input type="button" id="generatekeybutton" value="Generate" />
+  </fieldset>
+    <small id="key-helper">
+        Waiting on you to click the button
+    </small>
+
+
+    <input type="submit" value="Send to the machine" />
+</form>
 
 </main>
 <style>
+    :root {
+          --pico-font-size: 1em !important !important;
+    }
     body {
-        background-color: whitesmoke;
+                {{!-- background-color: whitesmoke; --}}
     }
 </style>
 

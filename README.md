@@ -8,3 +8,7 @@ The idea is that the bot embeds a website that generates a simple webapp which, 
 - Once the user has a private key, allow them to encrypt messages targeting other registered users RSA public keys.
 
 The de-encrypted message never leaves the users embed. All the encryption is done locally.
+
+### todo
+- add a feature to see your private key (encrypted)
+- add a feature to provide your own key pair 
