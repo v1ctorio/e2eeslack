@@ -26,5 +26,9 @@ You are on slug <%= it.slug %>.
         background-color: whitesmoke;
     }
 </style>
+
+<script type="module">
+    <%~ include("./something.js.eta") %>
+</script>
 </body>
 </html>

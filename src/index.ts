@@ -94,9 +94,9 @@ slack.command(
         },
         callback_id: slug,
         blocks: responseBlocks,
-        submit: {
+        close: {
           type: "plain_text",
-          text: "done"
+          text: "Done"
         }
       }
     })
