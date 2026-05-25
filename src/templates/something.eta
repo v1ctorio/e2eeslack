@@ -9,6 +9,7 @@
   rel="stylesheet"
   href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.jade.min.css"
 >
+    <script src="https://cdn.jsdelivr.net/npm/jsencrypt@latest/bin/jsencrypt.min.js"></script>
 </head>
 <body>
 
@@ -19,7 +20,7 @@ Hi <%= it.name %>!
     <p>
 You are on slug <%= it.slug %>.
     </p>
-    <form>
+    <form id="formulary">
         <label>
             Passphrase
     <input
@@ -34,10 +35,11 @@ You are on slug <%= it.slug %>.
         </label>
     <fieldset role="group">
     <input
+      id="key-input"
       type="text"
       name="key"
       placeholder=""
-      disabled
+      readonly
     />
     <input type="button" id="generatekeybutton" value="Generate" />
   </fieldset>

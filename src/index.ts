@@ -4,6 +4,8 @@ import {Eta} from "eta"
 import { config } from "dotenv";
 import { randomUUID, UUID } from "crypto"
 import path from "path";
+import * as express from "express"
+import { STATUS_CODES } from "http";
 config();
 
 
@@ -19,15 +21,17 @@ const {
 
 //This is so silly but tscompiler is trash
 const eta = new Eta({views: path.join(import.meta.dirname,"../src", "templates")})
+const assetsPath = path.join(import.meta.dirname,"../src", "assets")
 
-const receiver = new ExpressReceiver({signingSecret: SLACK_SIGNING_SECRET!,});
+const receiver = new ExpressReceiver({signingSecret: SLACK_SIGNING_SECRET!});
 
 interface PageKind {
   user: string; // slack id 
   kind: 'registration'; // kind of page 
 }
 
-const slugs = new Map<string, PageKind>()
+const slugs = new Map<string, PageKind>() // slug to PageKind
+const users = new Map<string, UserData>() // user slack id to UserData
 
 //DEBUG
 slugs.set("quecosa", {
@@ -45,9 +49,9 @@ const slack = new App({
 
 
 
-interface User {
-  slack_id: string;
-  pub_key: string;
+interface UserData {
+//  slack_id: string; the slack ID is they key
+  public_key: string;
   private_key: string; // Private keys should ALWAYS have a passphrase
 }
 
@@ -111,12 +115,33 @@ receiver.router.get("/slug/:slug", (req, res) => {
 
   if (!page) return res.status(404).send("Slug not found, weird")
 
-  res.status(200).send(eta.render("./something", {name:"que", slug}))
+  res.status(200).send(eta.render("./something", {name:"que", slug, slack_user_id: page.user}))
+})
+
+receiver.router.get("/openpgp.min.mjs",(req, res)=>{
+  res.status(200).sendFile(path.join(assetsPath, "openpgp.min.mjs"))
 })
 
 receiver.router.get("/que", (r, res) =>{
   res.status(200).send("so")
 })
+
+receiver.router.post("/postKey", express.json(), (req, res) => {
+  const body = req.body
+  console.log("received a post request",body)
+  if (!body["slug"] || !body["public_key"] || !body["private_key"]) {
+    res.status(422).send("unprocessable body")
+  }
+
+  if (!save_user(body as registrationFormData)) return res.status(500).send("server error")
+
+  res.status(200).send("ok")
+})
+
+
+await slack.start(PORT!);
+await slack.logger.info("Slack app started in", PORT!)
+
 
 
 function generateSlug(k: PageKind) {
@@ -124,5 +149,20 @@ function generateSlug(k: PageKind) {
   slugs.set(slug, k);
   return slug;
 }
-await slack.start(PORT!);
-await slack.logger.info("Slack app started in", PORT!)
+
+function save_user(payload:registrationFormData): boolean {
+  const { public_key, private_key, slug} = payload
+  const slug_data = slugs.get(slug)
+  if (!slug_data) return false
+  if (slug_data.kind != "registration") return false
+
+  users.set(slug_data.user,{private_key, public_key})
+
+  return true
+}
+
+interface registrationFormData {
+  private_key: string
+  public_key: string
+  slug: string
+}

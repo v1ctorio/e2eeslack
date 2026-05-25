@@ -2,11 +2,23 @@
 //@ts-nocheck
 // NOO i cannot have typescript in the browser. I mean i could transpile ts but I'm not bothered enough
 const keyHelper = document.getElementById("key-helper")
+const form = document.getElementById("formulary")
 const passphraseInput = document.getElementById("passphrase-input") 
+const keyInput = document.getElementById("key-input")
+const SLACK_USER_ID = "<%= it.slack_user_id %>"
+const SLUG = "<%= it.slug %>"
 
-function setMessage(t, isError = false) {
+let private_key, public_key
+
+import * as openpgp from "/openpgp.min.mjs"
+
+keyInput.value = ""
+
+function setMessage(t, isError = false, isSuccess = false) {
     if (isError) {
         keyHelper.style.color = "red"
+    } else if (isSuccess) {
+        keyHelper.style.color = "green"
     } else {
         keyHelper.style.color = "var(--pico-muted-color)"
     }
@@ -16,6 +28,40 @@ function setMessage(t, isError = false) {
 //TODO remove debug sleeps and find a prettier way to show the process
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+
+form.onsubmit = (e) => {
+    e.preventDefault()
+
+    if(!private_key || !public_key) {
+        setMessage("You must generate your key before submitting!",true)
+        return
+    }
+
+    const payload = {
+        private_key,
+        public_key,
+        slug: SLUG,
+    }
+
+    fetch("/postKey", { method: "POST", body: JSON.stringify(payload), headers: {"Content-Type": "application/json"} })
+        .catch(e=>{
+            console.error("Error submitting the key pair",e)
+            setMessage("Something happened trying to submit the key pair !?", true)
+            
+        })
+        .then(res=>{
+            if (!res.ok) {                
+            console.error("Error submitting the key pair",e)
+            setMessage("Something happened when submitting the key pair !?", true)
+            return
+            }
+            setMessage("Successfully sent the key pair to the server", false, true)
+            // TODO remove the form
+        })
+    console.log("clicked the submit form button")
+
 }
 
 
@@ -32,62 +78,25 @@ document.getElementById("generatekeybutton").addEventListener("click", async (e)
     setMessage("Generating RSA key pair and encrypting your private key")
     await sleep(1000)
 
-    const keyPair = await generateAndEncryptKeyPair(passphraseInput.value)
+    const keyPair = await generateAndEncryptKeyPair(passphraseInput.value, SLACK_USER_ID)
     console.log(keyPair)
+    setMessage("Generated key pair")
+    keyInput.value = keyPair.publicKey
+    public_key = keyPair.publicKey
+    private_key = keyPair.privateKey
 
 
     
 })
 
 
-async function generateAndEncryptKeyPair(passphrase) {
-    const keyPair = await crypto.subtle.generateKey(
-        {
-      name: "RSA-OAEP",
-      modulusLength: 2048,
-      hash: "SHA-256",
-      publicExponent: new Uint8Array([1, 0, 1])
-    },
-    true,  
-    ["decrypt", "encrypt"]
-    )
 
-    const baseKey = await crypto.subtle.importKey(
-        "raw",
-        new TextEncoder().encode(passphrase),
-        {name: "PBKDF2"},
-        false,
-        ["deriveKey"]
-    )
-
-    const wrappingKey = await crypto.subtle.deriveKey(
-        {
-            name:"PBKDF2",
-            salt: new Uint8Array(0), // Uhh, empty salt yeah
-            iterations: 100_000,
-            hash: "SHA-256"
-        },
-        baseKey,
-        {
-            name: "AES-KW", 
-            length: 256,
-        },
-        false,
-        ["wrapKey"]
-    )
-
-    const encryptedPrivateKey = await crypto.subtle.wrapKey(
-        "pkcs8",
-        keyPair.privateKey,
-        wrappingKey,
-        {name:"AES-KW"}
-    )
-
-    const publicKey = await crypto.subtle.exportKey("spki", keyPair.publicKey);
-
-  return {
-    publicKey: new Uint8Array(publicKey),
-    encryptedPrivateKey: new Uint8Array(encryptedPrivateKey)
-  };
+async function generateAndEncryptKeyPair(passphrase, slack_id) {
+    const { publicKey, privateKey } = await openpgp.generateKey({
+        type: "rsa",
+        userIDs: [{name: slack_id}],
+        passphrase
+    })
     
+    return { publicKey, privateKey }
 }
