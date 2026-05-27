@@ -7,7 +7,7 @@ import path from "path";
 import * as express from "express"
 import { STATUS_CODES } from "http";
 config();
-
+import * as pgp from "openpgp"
 
 
 const {
@@ -127,13 +127,13 @@ receiver.router.get("/que", (r, res) =>{
 })
 
 receiver.router.post("/postKey", express.json(), (req, res) => {
-  const body = req.body
+  const body: registrationFormData = req.body
   console.log("received a post request",body)
   if (!body["slug"] || !body["public_key"] || !body["private_key"]) {
     res.status(422).send("unprocessable body")
   }
 
-  if (!save_user(body as registrationFormData)) return res.status(500).send("server error")
+  if (!save_user(body )) return res.status(500).send("server error")
 
   res.status(200).send("ok")
 })
@@ -158,7 +158,13 @@ function save_user(payload:registrationFormData): boolean {
 
   users.set(slug_data.user,{private_key, public_key})
 
-  return true
+  
+  
+  slack.client.chat.postMessage({
+    channel: slug_data.user,
+    text: "Successfully registered to E2EE Slack with "
+  }) 
+   return true
 }
 
 interface registrationFormData {
@@ -166,3 +172,4 @@ interface registrationFormData {
   public_key: string
   slug: string
 }
+

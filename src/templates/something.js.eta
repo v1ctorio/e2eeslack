@@ -100,3 +100,23 @@ async function generateAndEncryptKeyPair(passphrase, slack_id) {
     
     return { publicKey, privateKey }
 }
+const load_public_key = async (public_key) => await openpgp.readKey({armoredKey: public_key}) 
+
+
+async function load_private_key(private_key, passphrase) {
+  const encrypted = await openpgp.readKey({armoredKey: private_key}) 
+  const decrypted = await openpgp.decryptKey({privateKey: encryped,passphrase })
+  return decrypted
+}
+
+async function encrypt_message(decrypted_priv_key, message, target_keys = []) {
+
+    const targets = await target_ids.map(async raw=>{
+        return await load_public_key()
+
+    }).filter(a=>a)
+    
+    const msg = await openpgp.createClearTextMessage({text:message})
+
+    return await openpgp.encrypt({signingKeys: decrypted_priv_key, message: msg, encyptionKeys: targets})
+}
