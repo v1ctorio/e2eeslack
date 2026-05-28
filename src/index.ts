@@ -59,7 +59,7 @@ interface UserData {
 
 
 
-const possible_commands = ["register", "send", "self"] 
+const possible_commands = ["register", "send", "self", "delete_my_data"] 
 slack.command(
 	"/e2ee",
 	async ({ ack, body, client, respond, command }) => {
@@ -119,9 +119,19 @@ slack.command(
         }
       }
     })
-    console.log("res =", res)
+
+    break;
+    case "delete_my_data":
+      await respond({response_type: "ephemeral", text:"Deleting your data..."})
+      await delete_user(body.user_id)
+    break
+    case "self":
+      const user_data = await getUserData(body.user_id)
+      await respond({response_type: "ephemeral", text: "```\n"+JSON.stringify(user_data,null,4)+"\n```"}) //TODO prettify ts
+
+    break
     }
-    	},
+  },
 );
 
 
@@ -178,7 +188,7 @@ async function save_user(payload:registrationFormData): Promise<boolean> {
   
   slack.client.chat.postMessage({
     channel: slug_data.user,
-    text: "Successfully registered to E2EE Slack with private key: ***redacted***, public key: \n ```\n" + public_key + "\n```"
+    text: "Successfully registered to E2EE Slack with private key (encrypted, you must preserve your passphrase): `redacted`, public key: \n ```\n" + public_key + "\n```"
   }).catch(e=>console.error(e)).then(m=>console.log(`sent registration message${m}`))
    return true
 }
@@ -189,3 +199,23 @@ interface registrationFormData {
   slug: string
 }
 
+
+async function delete_user(slack_id:string): Promise<boolean> {
+  try {
+    await db.delete([USERS, slack_id])
+  } catch {
+    return false
+  }
+  slack.client.chat.postMessage({
+    channel: slack_id,
+    text: "Delete your key pair from my database. You may register again using `/e2ee register`."
+  })
+  return true
+}
+
+async function getUserData(slack_id:string): Promise<UserData|null> {
+  const val = (await db.get([USERS, slack_id])).value
+
+  if(!val) return null;
+  else return val as UserData
+}
