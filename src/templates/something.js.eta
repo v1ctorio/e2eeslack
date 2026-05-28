@@ -5,6 +5,7 @@ const keyHelper = document.getElementById("key-helper")
 const form = document.getElementById("formulary")
 const passphraseInput = document.getElementById("passphrase-input") 
 const keyInput = document.getElementById("key-input")
+const submitButton = document.getElementById("submitbutton")
 const SLACK_USER_ID = "<%= it.slack_user_id %>"
 const SLUG = "<%= it.slug %>"
 
@@ -31,7 +32,8 @@ function sleep(ms) {
 }
 
 
-form.onsubmit = (e) => {
+const submitoverride = (e) => {
+    console.log("Trying to prevent default form submission")
     e.preventDefault()
 
     if(!private_key || !public_key) {
@@ -64,6 +66,9 @@ form.onsubmit = (e) => {
 
 }
 
+// idk why do i need to do that
+form.onsubmit = submitoverride
+submitButton.onclick = submitoverride
 
 document.getElementById("generatekeybutton").addEventListener("click", async (e) => {
 

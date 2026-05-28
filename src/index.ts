@@ -27,6 +27,7 @@ const receiver = new ExpressReceiver({signingSecret: SLACK_SIGNING_SECRET!});
 
 interface PageKind {
   user: string; // slack id 
+  user_name: string;
   kind: 'registration'; // kind of page 
 }
 
@@ -36,7 +37,8 @@ const users = new Map<string, UserData>() // user slack id to UserData
 //DEBUG
 slugs.set("quecosa", {
   kind: "registration",
-  user: "U1234567"
+  user: "U1234567",
+  user_name: "Jorge"
 })
 
 
@@ -57,15 +59,28 @@ interface UserData {
 
 
 
+const possible_commands = ["register", "send", "self"] 
 slack.command(
 	"/e2ee",
 	async ({ ack, body, client, respond, command }) => {
 		await ack();
 		const args = body.text;
+    let cmd = args.split(" ")[0]
+    console.log(`Received from ${body.user_id} - /e2ee ${args}`)
 
+    const userData = users.get(body.user_id)
+    if (!userData) cmd = "register"
 
+    console.log(`Parsed cmd =`, cmd)
 
-    const slug = generateSlug({user: body.user_id, kind: "registration"})
+    if (!possible_commands.includes(cmd)) {
+      await respond({response_type: "ephemeral", text: `Unknown command, available: ${possible_commands.map(c=>`\`${c}\``).join(", ")}`})
+      return;
+    }
+
+    switch (cmd) {
+      case "register":
+      const slug = generateSlug({user: body.user_id, kind: "registration", user_name: body.user_name})
     const targetVideoUrl = `${SELF_BASE_URL}/slug/${slug}`
 
     const responseBlocks = [
@@ -88,7 +103,7 @@ slack.command(
     //  blocks: responseBlocks
     //})
 
-    await client.views.open({
+    const res = await client.views.open({
       trigger_id: body.trigger_id,
       view: {
         type: "modal",
@@ -104,7 +119,9 @@ slack.command(
         }
       }
     })
-	},
+    console.log("res =", res)
+    }
+    	},
 );
 
 
@@ -115,7 +132,7 @@ receiver.router.get("/slug/:slug", (req, res) => {
 
   if (!page) return res.status(404).send("Slug not found, weird")
 
-  res.status(200).send(eta.render("./something", {name:"que", slug, slack_user_id: page.user}))
+  res.status(200).send(eta.render("./something", {name:page.user_name, slug, slack_user_id: page.user}))
 })
 
 receiver.router.get("/openpgp.min.mjs",(req, res)=>{
@@ -133,7 +150,7 @@ receiver.router.post("/postKey", express.json(), (req, res) => {
     res.status(422).send("unprocessable body")
   }
 
-  if (!save_user(body )) return res.status(500).send("server error")
+  if (!save_user(body)) return res.status(500).send("server error")
 
   res.status(200).send("ok")
 })
@@ -159,11 +176,10 @@ function save_user(payload:registrationFormData): boolean {
   users.set(slug_data.user,{private_key, public_key})
 
   
-  
   slack.client.chat.postMessage({
     channel: slug_data.user,
-    text: "Successfully registered to E2EE Slack with "
-  }) 
+    text: "Successfully registered to E2EE Slack with private key: ***redacted***, public key: \n ```\n" + public_key + "\n```"
+  }).catch(e=>console.error(e)).then(m=>console.log(`sent registration message${m}`))
    return true
 }
 

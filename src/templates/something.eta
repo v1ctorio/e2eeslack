@@ -48,7 +48,7 @@ You are on slug <%= it.slug %>.
     </small>
 
 
-    <input type="submit" value="Send to the machine" />
+    <input type="submit" id="submitbutton" value="Send to the machine" />
 </form>
 
 </main>
