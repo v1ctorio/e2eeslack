@@ -7,8 +7,7 @@ import path from "path";
 import * as express from "express"
 config();
 import * as pgp from "openpgp"
-
-
+import { Valkeyrie } from 'valkeyrie';
 const {
 	SLACK_BOT_TOKEN,
 	SLACK_SIGNING_SECRET,
@@ -30,11 +29,13 @@ interface PageKind {
   kind: 'registration'; // kind of page 
 }
 
-const slugs = new Map<string, PageKind>() // slug to PageKind
-const users = new Map<string, UserData>() // user slack id to UserData
+//const slugs = new Map<string, PageKind>() // slug to PageKind
+const db = await Valkeyrie.open("./e2ee.db") 
+const SLUGS = "slugs", USERS = "users"
+const _users = new Map<string, UserData>() // user slack id to UserData
 
 //DEBUG
-slugs.set("quecosa", {
+await db.set([SLUGS, "quecosa"], {
   kind: "registration",
   user: "U1234567",
   user_name: "Jorge"
@@ -67,7 +68,7 @@ slack.command(
     let cmd = args.split(" ")[0]
     console.log(`Received from ${body.user_id} - /e2ee ${args}`)
 
-    const userData = users.get(body.user_id)
+    const userData = await (await db.get([USERS,body.user_id])).value
     if (!userData) cmd = "register"
 
     console.log(`Parsed cmd =`, cmd)
@@ -79,7 +80,7 @@ slack.command(
 
     switch (cmd) {
       case "register":
-      const slug = generateSlug({user: body.user_id, kind: "registration", user_name: body.user_name})
+      const slug = await generateSlug({user: body.user_id, kind: "registration", user_name: body.user_name})
     const targetVideoUrl = `${SELF_BASE_URL}/slug/${slug}`
 
     const responseBlocks = [
@@ -124,10 +125,10 @@ slack.command(
 );
 
 
-receiver.router.get("/slug/:slug", (req, res) => {
+receiver.router.get("/slug/:slug", async (req, res) => {
   const {slug} = req.params;
 
-  const page = slugs.get(slug)
+  const page = await (await db.get([SLUGS, slug])).value as PageKind
 
   if (!page) return res.status(404).send("Slug not found, weird")
 
@@ -142,14 +143,14 @@ receiver.router.get("/que", (r, res) =>{
   res.status(200).send("so")
 })
 
-receiver.router.post("/postKey", express.json(), (req, res) => {
+receiver.router.post("/postKey", express.json(), async (req, res) => {
   const body: registrationFormData = req.body
   console.log("received a post request",body)
   if (!body["slug"] || !body["public_key"] || !body["private_key"]) {
     res.status(422).send("unprocessable body")
   }
 
-  if (!save_user(body)) return res.status(500).send("server error")
+  if (!(await save_user(body))) return res.status(500).send("server error")
 
   res.status(200).send("ok")
 })
@@ -160,19 +161,19 @@ await slack.logger.info("Slack app started in", PORT!)
 
 
 
-function generateSlug(k: PageKind) {
+async function generateSlug(k: PageKind) {
   const slug = randomUUID();
-  slugs.set(slug, k);
+  await db.set([SLUGS, slug], k);
   return slug;
 }
 
-function save_user(payload:registrationFormData): boolean {
+async function save_user(payload:registrationFormData): Promise<boolean> {
   const { public_key, private_key, slug} = payload
-  const slug_data = slugs.get(slug)
+  const slug_data = await (await db.get([SLUGS, slug])).value as PageKind
   if (!slug_data) return false
   if (slug_data.kind != "registration") return false
 
-  users.set(slug_data.user,{private_key, public_key})
+  await db.set([USERS, slug_data.user],{private_key, public_key})
 
   
   slack.client.chat.postMessage({
