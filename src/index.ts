@@ -7,6 +7,7 @@ import path from "path";
 import * as express from "express"
 config();
 import * as pgp from "openpgp"
+import { PageKind, RegistrationFormData, UserData } from "./types.js";
 import { Valkeyrie } from 'valkeyrie';
 const {
 	SLACK_BOT_TOKEN,
@@ -23,16 +24,10 @@ const assetsPath = path.join(import.meta.dirname,"../src", "assets")
 
 const receiver = new ExpressReceiver({signingSecret: SLACK_SIGNING_SECRET!});
 
-interface PageKind {
-  user: string; // slack id 
-  user_name: string;
-  kind: 'registration'; // kind of page 
-}
 
 //const slugs = new Map<string, PageKind>() // slug to PageKind
 const db = await Valkeyrie.open("./e2ee.db") 
 const SLUGS = "slugs", USERS = "users"
-const _users = new Map<string, UserData>() // user slack id to UserData
 
 //DEBUG
 await db.set([SLUGS, "quecosa"], {
@@ -49,13 +44,6 @@ const slack = new App({
 });
 
 
-
-
-interface UserData {
-//  slack_id: string; the slack ID is they key
-  public_key: string;
-  private_key: string; // Private keys should ALWAYS have a passphrase
-}
 
 
 
@@ -81,21 +69,10 @@ slack.command(
     switch (cmd) {
       case "register":
       const slug = await generateSlug({user: body.user_id, kind: "registration", user_name: body.user_name})
-    const targetVideoUrl = `${SELF_BASE_URL}/slug/${slug}`
 
     const responseBlocks = [
-        {
-          type: "video",
-          alt_text: "embedded e2ee client",
-          title: {
-            type: "plain_text",
-            text: "E2EE Slack",
-          },
-        thumbnail_url: "https://http.cat/200", // TODO change this with an actual thumbnail 
-        video_url: targetVideoUrl
-        },
+        videoEmbedBlock("Register", slug)
       ]
-      slack.logger.info("Sending user to targetVideoUrl =",targetVideoUrl)
 
     //await respond({
     //  response_type: "ephemeral",
@@ -130,9 +107,86 @@ slack.command(
       await respond({response_type: "ephemeral", text: "```\n"+JSON.stringify(user_data,null,4)+"\n```"}) //TODO prettify ts
 
     break
+    case "send":
+      await client.views.open({
+        trigger_id: body.trigger_id,
+        view:  {
+	type: "modal",
+	title: {
+		type: "plain_text",
+		text: "E2EE Slack - Send",
+		emoji: true
+	},
+	submit: {
+		type: "plain_text",
+		text: "Encrypt",
+		emoji: true
+	},
+	close: {
+		type: "plain_text",
+		text: "Cancel",
+		emoji: true
+	},
+  callback_id: "encrypt_msg",
+	blocks: [
+		{
+			"type": "section",
+			"text": {
+				"type": "mrkdwn",
+				"text": "After selecting the recipients, you will be prompted to write and encrypt the message."
+			}
+		},
+		{
+			"type": "input",
+			"element": {
+				"type": "multi_users_select",
+				"placeholder": {
+					"type": "plain_text",
+					"text": "Select users",
+					"emoji": true
+				},
+				"action_id": "multi_users_select-action"
+			},
+			"label": {
+				"type": "plain_text",
+				"text": "Recipients",
+				"emoji": true
+			},
+			"optional": false
+		}
+	]
+} // hs typescript is so bad. i should be using slack-block-builder
+      })
+    break
     }
   },
 );
+
+
+slack.view("encrypt_msg", async ({ack, body, client, respond})=>{
+  console.log("Received message encryption modals submission")
+  console.log("state =", body.view.state)
+  let recipients = body.view.state?.values?.mv0Ig["multi_users_select-action"]?.selected_users
+  await ack();
+  
+  if (!recipients) recipients = []
+  if (recipients.length == 0) {
+    await respond({response_type: "ephemeral", text: "You must select at least one recipient!"})
+    return
+  }
+
+  console.log("recipients = ", recipients)
+
+  const slug = generateSlug({
+    kind: "write_message",
+    recipients,
+    user: body.user.id,
+    user_name: body.user.name
+  })
+
+
+
+})
 
 
 receiver.router.get("/slug/:slug", async (req, res) => {
@@ -154,7 +208,7 @@ receiver.router.get("/que", (r, res) =>{
 })
 
 receiver.router.post("/postKey", express.json(), async (req, res) => {
-  const body: registrationFormData = req.body
+  const body: RegistrationFormData = req.body
   console.log("received a post request",body)
   if (!body["slug"] || !body["public_key"] || !body["private_key"]) {
     res.status(422).send("unprocessable body")
@@ -177,7 +231,7 @@ async function generateSlug(k: PageKind) {
   return slug;
 }
 
-async function save_user(payload:registrationFormData): Promise<boolean> {
+async function save_user(payload:RegistrationFormData): Promise<boolean> {
   const { public_key, private_key, slug} = payload
   const slug_data = await (await db.get([SLUGS, slug])).value as PageKind
   if (!slug_data) return false
@@ -191,12 +245,6 @@ async function save_user(payload:registrationFormData): Promise<boolean> {
     text: "Successfully registered to E2EE Slack with private key (encrypted, you must preserve your passphrase): `redacted`, public key: \n ```\n" + public_key + "\n```"
   }).catch(e=>console.error(e)).then(m=>console.log(`sent registration message${m}`))
    return true
-}
-
-interface registrationFormData {
-  private_key: string
-  public_key: string
-  slug: string
 }
 
 
@@ -218,4 +266,18 @@ async function getUserData(slack_id:string): Promise<UserData|null> {
 
   if(!val) return null;
   else return val as UserData
+}
+
+
+function videoEmbedBlock(page_title: string, slug: string) {
+  return {
+          type: "video",
+          alt_text: "embedded e2ee client",
+          title: {
+            type: "plain_text",
+            text: "E2EE Slack - " + page_title,
+          },
+        thumbnail_url: "https://http.cat/200", // TODO change this with an actual thumbnail 
+        video_url: SELF_BASE_URL+"/slug/"+slug
+        }
 }
