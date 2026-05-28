@@ -5,7 +5,6 @@ import { config } from "dotenv";
 import { randomUUID, UUID } from "crypto"
 import path from "path";
 import * as express from "express"
-import { STATUS_CODES } from "http";
 config();
 import * as pgp from "openpgp"
 

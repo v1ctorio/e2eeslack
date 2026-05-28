@@ -14,7 +14,6 @@
 	"dependencies": {
 		"@slack/bolt": "^4.7.2",
 		"dotenv": "^17.4.2",
-		"esmapdb": "^0.4.0",
 		"eta": "^4.6.0",
 		"express": "^5.2.1",
 		"openpgp": "^6.3.0",
