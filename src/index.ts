@@ -177,6 +177,26 @@ slack.view("encrypt_msg", async ({ack, body, client, respond})=>{
 
   console.log("recipients = ", recipients)
 
+
+  const unregisteredRecipients: Array<string> = []
+  const recipientSPubKeys = recipients.map(async r=>{
+    const d = await getUserData(r)
+    if (!d) {
+      unregisteredRecipients.push(`<@r>`)
+      return null
+    }
+    return d.public_key
+  }).filter(k=>k)
+
+  if (unregisteredRecipients.length > 0) { //do something (else?) because not all the selected recipients are registered
+    await respond({
+      response_type: "ephemeral",
+      text: `The following selected recipients do not have public keys stored in E2EE Slack: ${unregisteredRecipients.join(", ")}.
+      They must store one using \`/e2ee\` before being able to receive messages.`})
+    return
+  }
+
+
   const slug = generateSlug({
     kind: "write_message",
     recipients,
