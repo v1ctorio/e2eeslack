@@ -7,7 +7,7 @@ import path from "path";
 import * as express from "express";
 config();
 import * as pgp from "openpgp";
-import { PageKind, RegistrationFormData, UserData } from "./types.js";
+import type { PageKind, RegistrationFormData, UserData } from "./types.js";
 import { Valkeyrie } from "valkeyrie";
 const {
   SLACK_BOT_TOKEN,
@@ -65,7 +65,7 @@ slack.command("/e2ee", async ({ ack, body, client, respond, command }) => {
   }
 
   switch (cmd) {
-    case "register":
+    case "register": {
       const slugData = {
         user: body.user_id,
         kind: "registration" as const,
@@ -104,6 +104,7 @@ slack.command("/e2ee", async ({ ack, body, client, respond, command }) => {
       });
 
       break;
+    }
     case "delete_my_data":
       await respond({
         response_type: "ephemeral",
@@ -111,7 +112,7 @@ slack.command("/e2ee", async ({ ack, body, client, respond, command }) => {
       });
       await delete_user(body.user_id);
       break;
-    case "self":
+    case "self": {
       const user_data = await getUserData(body.user_id);
       await respond({
         response_type: "ephemeral",
@@ -119,6 +120,7 @@ slack.command("/e2ee", async ({ ack, body, client, respond, command }) => {
       }); //TODO prettify ts
 
       break;
+    }
     case "send":
       await client.views.open({
         trigger_id: body.trigger_id,
@@ -203,7 +205,7 @@ slack.view("encrypt_msg", async ({ ack, body, client }) => {
   };
 
   if (!recipients) recipients = [];
-  if (recipients.length == 0) {
+  if (recipients.length === 0) {
     await respond("You must select at least one recipient!");
     return;
   }
@@ -278,7 +280,7 @@ receiver.router.get("/slug/:slug", async (req, res) => {
 
   if (!page) return res.status(404).send("Slug not found, weird");
 
-  if (page.kind == "registration") {
+  if (page.kind === "registration") {
     res
       .status(200)
       .send(
@@ -288,7 +290,7 @@ receiver.router.get("/slug/:slug", async (req, res) => {
           slack_user_id: page.user,
         }),
       );
-  } else if (page.kind == "write_message") {
+  } else if (page.kind === "write_message") {
     const user_data = await getUserData(page.user);
     if (!user_data)
       return res.status(500).send("server error: user data not found");
@@ -332,9 +334,9 @@ async function save_user(payload: RegistrationFormData): Promise<boolean> {
   const { public_key, private_key, slug } = payload;
   const slug_data = (await (await db.get([SLUGS, slug])).value) as PageKind;
   if (!slug_data) return false;
-  if (slug_data.kind != "registration") return false;
+  if (slug_data.kind !== "registration") return false;
 
-  let fingerprint;
+  let fingerprint: string;
   try {
     const parsedKey = await pgp.readKey({ armoredKey: payload.public_key });
     fingerprint = parsedKey.getFingerprint();
