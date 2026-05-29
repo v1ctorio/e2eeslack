@@ -241,7 +241,14 @@ async function save_user(payload:RegistrationFormData): Promise<boolean> {
   if (!slug_data) return false
   if (slug_data.kind != "registration") return false
 
-  await db.set([USERS, slug_data.user],{private_key, public_key})
+  let fingerprint
+  try {
+    const parsedKey = await pgp.readKey({armoredKey: payload.public_key})
+    fingerprint = parsedKey.getFingerprint()
+  } catch {
+    return false
+  }
+  await db.set([USERS, slug_data.user],{private_key, public_key, fingerprint})
 
   
   slack.client.chat.postMessage({

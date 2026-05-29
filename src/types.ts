@@ -17,6 +17,7 @@ export interface UserData {
 //  slack_id: string; the slack ID is they key
   public_key: string;
   private_key: string; // Private keys should ALWAYS have a passphrase
+  fingerprint: string;
 }
 
 
