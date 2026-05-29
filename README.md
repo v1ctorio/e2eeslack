@@ -7,7 +7,7 @@ The idea is that the bot embeds a website that generates a simple webapp which, 
 - create a openpgp key pair which is stored in the server. The private key is encrypted with a passphrase so the service can't decrypt it.
 - Once the user has a private key, allow them to encrypt messages targeting other registered users public keys.
 
-The de-encrypted message never leaves the users embed. All the encryption is done locally.
+The de-encrypted message never leaves the users client. All the encryption is done locally.
 
 ### todo
 - add a feature to see your private key (encrypted)

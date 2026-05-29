@@ -62,7 +62,7 @@ You are on slug <%= it.slug %>.
 </style>
 
 <script type="module">
-    <%~ include("./something.js.eta") %>
+    <%~ include("./registration.js.eta") %>
 </script>
 </body>
 </html>

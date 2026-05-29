@@ -195,8 +195,12 @@ receiver.router.get("/slug/:slug", async (req, res) => {
   const page = await (await db.get([SLUGS, slug])).value as PageKind
 
   if (!page) return res.status(404).send("Slug not found, weird")
-
-  res.status(200).send(eta.render("./something", {name:page.user_name, slug, slack_user_id: page.user}))
+    
+  if(page.kind == "registration") {
+    res.status(200).send(eta.render("./registration", {name:page.user_name, slug, slack_user_id: page.user}))
+  } else if (page.kind == "write_message") {
+    res.status(200).send(eta.render("./write_message", {}))
+  }
 })
 
 receiver.router.get("/openpgp.min.mjs",(req, res)=>{
