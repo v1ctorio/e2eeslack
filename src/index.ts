@@ -253,7 +253,7 @@ async function save_user(payload:RegistrationFormData): Promise<boolean> {
   
   slack.client.chat.postMessage({
     channel: slug_data.user,
-    text: "Successfully registered to E2EE Slack with private key (encrypted, you must preserve your passphrase): `redacted`, public key: \n ```\n" + public_key + "\n```"
+    text: "Successfully registered to E2EE Slack with private key (encrypted, you must preserve your passphrase): `redacted`, public key fingerprint: `"+fingerprint+"`. \nTo see your full keys, use `/e2ee self`"
   }).catch(e=>console.error(e)).then(m=>console.log(`sent registration message${m}`))
    return true
 }
