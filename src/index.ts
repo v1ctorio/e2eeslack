@@ -170,6 +170,7 @@ slack.command(
 
 
 slack.view("encrypt_msg", async ({ack, body, client, })=>{
+  console.time("viewsubm")
   console.log("Received message encryption modals submission")
   console.log("state =", body.view.state)
   let recipients = body.view.state?.values?.mv0Ig["multi_users_select-action"]?.selected_users
@@ -187,11 +188,11 @@ slack.view("encrypt_msg", async ({ack, body, client, })=>{
           text: {
             type: "mrkdwn",
             text: text
-          }
+          } 
         }]
       }
     })
-      return 
+      return res
       }
   
   if (!recipients) recipients = []
@@ -211,7 +212,7 @@ slack.view("encrypt_msg", async ({ack, body, client, })=>{
       return null
     }
     return d.public_key
-  }))).filter(k=>k)
+  }))).filter(k=>k) as string[]
 
 
   console.log("recipientspubkeys =",recipientSPubKeys)
@@ -219,19 +220,38 @@ slack.view("encrypt_msg", async ({ack, body, client, })=>{
   if (unregisteredRecipients.length > 0) { //do something (else?) because not all the selected recipients are registered
     console.log("0 < unregisteredRecipients =", unregisteredRecipients)
     await respond(`The following selected recipients do not have public keys stored in E2EE Slack: ${unregisteredRecipients.join(", ")}.
-They must store one using \`/e2ee\` before being able to receive messages.`)
+\nThey must store one using \`/e2ee\` before being able to receive messages.`)
     return
   }
 
+  const author_private_key = (await db.get([USERS, body.user.id]))?.value as UserData ["private_key"];
+  if (!author_private_key) {await respond("Missing private key! Register first using `/e2ee`."); return }
 
-  const slug = generateSlug({
+  const slug = await generateSlug({
     kind: "write_message",
-    recipients,
+    //recipients,
+    recipients_keys: recipientSPubKeys,
     user: body.user.id,
-    user_name: body.user.name
+    user_name: body.user.name,
+    author_private_key 
   })
+  if (!slug) {await respond("Internal server error."); return}
 
-
+  console.timeEnd("viewsubm")
+  // Seems like slack is rejecting my video blocks when updating through ack(?)
+  const res = await respond("processing...")
+  await client.views.update({
+    view_id: body.view.id,
+    view: {
+      type: "modal",
+      title: {type: "plain_text",text:"E2EE Slack - Encrypt"},
+      blocks: [videoEmbedBlock("Encrypt",slug)],
+      close: {
+        type: "plain_text",
+        text: "Done"
+      }
+    }
+  })
 
 })
 
@@ -246,7 +266,9 @@ receiver.router.get("/slug/:slug", async (req, res) => {
   if(page.kind == "registration") {
     res.status(200).send(eta.render("./registration", {name:page.user_name, slug, slack_user_id: page.user}))
   } else if (page.kind == "write_message") {
-    res.status(200).send(eta.render("./write_message", {}))
+    const user_data = await getUserData(page.user)
+    if (!user_data) return res.status(500).send("server error: user data not found")
+    res.status(200).send(eta.render("./write_message", {fingerprint:user_data}))
   }
 })
 

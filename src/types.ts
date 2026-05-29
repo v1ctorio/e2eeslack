@@ -9,7 +9,9 @@ export interface writeMessagePage {
     user: string;
     user_name: string;
     kind: 'write_message';
-    recipients: string[]; // recipient slack ids
+    recipients?: string[]; // recipient slack ids (do i really need this for anything?)
+    recipients_keys: string[];
+    author_private_key: string;
 }
 
 export type PageKind = registrationPage | writeMessagePage
