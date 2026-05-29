@@ -68,7 +68,8 @@ slack.command(
 
     switch (cmd) {
       case "register":
-      const slug = await generateSlug({user: body.user_id, kind: "registration", user_name: body.user_name})
+      const slugData = {user: body.user_id, kind: "registration" as const, user_name: body.user_name}      
+      const slug = await generateSlug(slugData)
 
     const responseBlocks = [
         videoEmbedBlock("Register", slug)
@@ -95,6 +96,11 @@ slack.command(
           text: "Done"
         }
       }
+    })
+
+    await db.set([USERS, body.user_id], {
+      ...slugData,
+      view_id: res.view?.id
     })
 
     break;
@@ -163,15 +169,34 @@ slack.command(
 );
 
 
-slack.view("encrypt_msg", async ({ack, body, client, respond})=>{
+slack.view("encrypt_msg", async ({ack, body, client, })=>{
   console.log("Received message encryption modals submission")
   console.log("state =", body.view.state)
   let recipients = body.view.state?.values?.mv0Ig["multi_users_select-action"]?.selected_users
-  await ack();
+  const respond = async (text: string) => {
+    const res = await ack({
+      response_action: "update",
+      view: {
+        type: "modal",
+        title: {
+          type: "plain_text",
+          text:"E2EE Slack - Error"
+        }, 
+        blocks: [{
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: text
+          }
+        }]
+      }
+    })
+      return 
+      }
   
   if (!recipients) recipients = []
   if (recipients.length == 0) {
-    await respond({response_type: "ephemeral", text: "You must select at least one recipient!"})
+    await respond("You must select at least one recipient!")
     return
   }
 
@@ -179,20 +204,22 @@ slack.view("encrypt_msg", async ({ack, body, client, respond})=>{
 
 
   const unregisteredRecipients: Array<string> = []
-  const recipientSPubKeys = recipients.map(async r=>{
+  const recipientSPubKeys = (await Promise.all(recipients.map(async r=>{
     const d = await getUserData(r)
     if (!d) {
-      unregisteredRecipients.push(`<@r>`)
+      unregisteredRecipients.push(`<@${r}>`)
       return null
     }
     return d.public_key
-  }).filter(k=>k)
+  }))).filter(k=>k)
 
+
+  console.log("recipientspubkeys =",recipientSPubKeys)
+  console.log("unregistered =", unregisteredRecipients)
   if (unregisteredRecipients.length > 0) { //do something (else?) because not all the selected recipients are registered
-    await respond({
-      response_type: "ephemeral",
-      text: `The following selected recipients do not have public keys stored in E2EE Slack: ${unregisteredRecipients.join(", ")}.
-      They must store one using \`/e2ee\` before being able to receive messages.`})
+    console.log("0 < unregisteredRecipients =", unregisteredRecipients)
+    await respond(`The following selected recipients do not have public keys stored in E2EE Slack: ${unregisteredRecipients.join(", ")}.
+They must store one using \`/e2ee\` before being able to receive messages.`)
     return
   }
 
@@ -240,6 +267,7 @@ receiver.router.post("/postKey", express.json(), async (req, res) => {
 
   if (!(await save_user(body))) return res.status(500).send("server error")
 
+  // TODO use views.update to change the view
   res.status(200).send("ok")
 })
 

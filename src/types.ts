@@ -3,6 +3,7 @@ export interface registrationPage {
   user: string; // slack id 
   user_name: string;
   kind: 'registration'; // kind of page 
+  view_id?: string;
 }
 export interface writeMessagePage {
     user: string;
