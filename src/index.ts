@@ -291,12 +291,13 @@ receiver.router.get("/slug/:slug", async (req, res) => {
         }),
       );
   } else if (page.kind === "write_message") {
-    const user_data = await getUserData(page.user);
-    if (!user_data)
-      return res.status(500).send("server error: user data not found");
+    //const user_data = await getUserData(page.user);
+    // if (!user_data)
+      // return res.status(500).send("server error: user data not found");
+    const recipient_keys_const = `const _recipient_keys = ${JSON.stringify(page.recipients_keys)}`
     res
       .status(200)
-      .send(eta.render("./write_message", { fingerprint: user_data }));
+      .send(eta.render("./write_message", { name: page.user_name, author_private_key: page.author_private_key, recipient_keys_const}));
   }
 });
 

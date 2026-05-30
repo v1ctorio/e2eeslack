@@ -37,7 +37,7 @@ Hi <%= it.name %>! Your message will be encrypted for <%= it.recipient_names %>
       type="text"
       name="key"
       placeholder=""
-      value="fingerprint: <%= it.key_fingerprint %>"
+      value="fingerprint: ..."
       readonly
     />
   </fieldset>
@@ -47,9 +47,11 @@ Hi <%= it.name %>! Your message will be encrypted for <%= it.recipient_names %>
         placeholder="Dear Deer,"
         aria-label="message to encrypt"
         name="message"
+        disabled
+        autocorrect="on"
     ></textarea>
 
-    <input type="submit" id="submitbutton" value="Encrypt the message" />
+    <input type="submit" id="submitbutton" value="" />
 </form>
 
 </main>
@@ -63,6 +65,7 @@ Hi <%= it.name %>! Your message will be encrypted for <%= it.recipient_names %>
 </style>
 
 <script type="module">
+    <%= recipient_keys_const %>
     <%~ include("./write_message.js.eta") %>
 </script>
 </body>
